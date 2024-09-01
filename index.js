@@ -1,12 +1,20 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Events, GatewayIntentBits, Collection } = require("discord.js");
+const { checkRule } = require('./service');
+const { setRules, obtainRules } = require('./rules');
 
 require('dotenv').config();
 const token = process.env.TOKEN;
 
 // Create a new bot client
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ 
+	intents: [
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.MessageContent,
+	] 
+});
 
 
 // To create dynamic commands, we create a collection to store the commands
@@ -39,8 +47,15 @@ for (const folder of commandFolders) {
  * Runs whenever the client (bot) is ready to run!
  */
 client.once(Events.ClientReady, async readyClient => {
+	console.log(`Logged in as ${readyClient.user.tag}`);
+	console.log('Setting rules for today...');
+	
+	setRules();
+	const rules = obtainRules();
+  console.log(`Rules: \n \t1. ${rules[0].name} \n \t2. ${rules[1].name}`);
+
   console.log("Ready!");
-  console.log(`Logged in as ${readyClient.user.tag}`); 
+	console.log("------------------------------------");
 })
 
 /**
@@ -74,9 +89,27 @@ client.on(Events.MessageCreate, message => {
   console.log("Message created!")
   if (message.author.bot) return;
 
-  if (message.content.toLowerCase === 'ping') {
-    message.reply('Pong!');
-  }
+	console.log("--> " + message.content);
+	const originalContent = message.content;
+	const words = originalContent.split(" ");
+
+	let damage = 0;
+
+	for (const word of words) {
+		try {
+			if (checkRule(word)) {
+				console.log(`The word "${word}" is valid.`);
+				damage += word.length;
+			} else {
+				console.log(`The word "${word}" is invalid.`);
+			}
+		} catch (error) {
+			console.error(error);
+		}
+	}
+
+	console.log(`Total damage: ${damage}`);
+
 });
 
 // Run the client by logging in with your Token
