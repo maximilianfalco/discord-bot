@@ -1,8 +1,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Events, GatewayIntentBits, Collection } = require("discord.js");
-const { checkRule } = require('./service');
+const wordExists = require('word-exists');
+
+const { checkRule, getAttackMessage } = require('./service');
 const { setRules, obtainRules } = require('./rules');
+const { attackMonster, checkHealth, spawnMonster } = require('./monsters');
 
 require('dotenv').config();
 const token = process.env.TOKEN;
@@ -16,6 +19,12 @@ const client = new Client({
 	] 
 });
 
+//////////////////////////////////////// CONSTANTS ////////////////////////////////////////
+
+const HEALTH_PER_MEMBER = 1000;
+const DAMAGE_COUNTS = new Map();
+
+///////////////////////////////////////////////////////////////////////////////////////////
 
 // To create dynamic commands, we create a collection to store the commands
 client.commands = new Collection();
@@ -32,9 +41,11 @@ for (const folder of commandFolders) {
   // This readdirSync navigates towards the files (the command files) in the 'utility' folder
 	const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 	for (const file of commandFiles) {
+		// Goes through each file and requires it, obtaining their names and the logic inside them
 		const filePath = path.join(commandsPath, file);
 		const command = require(filePath);
-		// Set a new item in the Collection with the key as the command name and the value as the exported module
+		// Set a new item in the Collection with the key as the command name and the value as the exported module (logic contained)
+		// This check basically checks if the command was properly formatted and defined
 		if ('data' in command && 'execute' in command) {
 			client.commands.set(command.data.name, command);
 		} else {
@@ -56,6 +67,12 @@ client.once(Events.ClientReady, async readyClient => {
 
   console.log("Ready!");
 	console.log("------------------------------------");
+	console.log("Listening to messages... \n");
+
+	// Spawning the monster and determining its health
+	const guild = client.guilds.cache.get(process.env.GUILD_ID);
+	spawnMonster(HEALTH_PER_MEMBER * guild.memberCount);
+
 })
 
 /**
@@ -86,7 +103,6 @@ client.on(Events.InteractionCreate, async interaction => {
  * Listen to messages
  */
 client.on(Events.MessageCreate, message => {
-  console.log("Message created!")
   if (message.author.bot) return;
 
 	console.log("--> " + message.content);
@@ -97,19 +113,29 @@ client.on(Events.MessageCreate, message => {
 
 	for (const word of words) {
 		try {
-			if (checkRule(word)) {
+			if (checkRule(word) && wordExists(word)) {
 				console.log(`The word "${word}" is valid.`);
 				damage += word.length;
+
+				console.log(`Total damage: ${damage}`);
+				attackMonster(damage);
+				console.log(`Current health: ${checkHealth()}`);
+
+				message.reply(getAttackMessage(damage));
+	
 			} else {
-				console.log(`The word "${word}" is invalid.`);
+				if (!wordExists(word)) {
+					console.log(`The word "${word}" does not exist.`);
+					// Note that we are using a predefined library of words, so new words might not be included
+					// TODO: Improve this by using a more comprehensive dictionary
+				} else {
+					console.log(`The word "${word}" is invalid.`);
+				}
 			}
 		} catch (error) {
 			console.error(error);
 		}
 	}
-
-	console.log(`Total damage: ${damage}`);
-
 });
 
 // Run the client by logging in with your Token

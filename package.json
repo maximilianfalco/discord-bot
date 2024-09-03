@@ -12,7 +12,8 @@
   "license": "ISC",
   "dependencies": {
     "discord.js": "^14.15.3",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "word-exists": "^1.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
