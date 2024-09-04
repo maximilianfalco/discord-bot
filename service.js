@@ -53,4 +53,21 @@ const getAttackMessage = (damage) => {
   return messages[randomIndex];
 }
 
-module.exports = { checkRule, getAttackMessage };
+/**
+ * Mutes and unmutes attack notifications.
+ */
+let MUTED = false;
+
+const checkMuted = () => {
+  return MUTED;
+};
+
+const mute = () => {
+	MUTED = true;
+};
+
+const unmute = () => {
+	MUTED = false;
+};
+
+module.exports = { checkRule, getAttackMessage, checkMuted, mute, unmute };

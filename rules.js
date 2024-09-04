@@ -34,7 +34,7 @@ const rules = [
   new Rule(
     "NoRepeatingLetters",
     "The word must not contain any repeating letters.",
-    /^([a-zA-Z])(?!.*\1)[a-zA-Z]*$/
+    /^(?!.*(.).*\1)[a-zA-Z]+$/
   ),
   new Rule(
     "ContainsZ",
