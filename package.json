@@ -13,6 +13,7 @@
   "dependencies": {
     "discord.js": "^14.15.3",
     "dotenv": "^16.4.5",
+    "node-schedule": "^2.1.1",
     "word-exists": "^1.0.0"
   },
   "devDependencies": {

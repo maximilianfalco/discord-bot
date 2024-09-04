@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Events, GatewayIntentBits, Collection } = require("discord.js");
 const wordExists = require('word-exists');
+const schedule = require('node-schedule');
 
 const { checkRule, getAttackMessage, checkMuted } = require('./service');
 const { setRules, obtainRules } = require('./rules');
@@ -105,12 +106,14 @@ client.once(Events.ClientReady, async readyClient => {
 		return;
 	};
 
-	spawnWrapper();
+	// spawnWrapper();
 
 	// Spawning the monster and determining its health
-  // setTimeout(() => {
-  //   setInterval(spawnWrapper, MONSTER_SPAWN_INTERVAL * 1000);
-  // }, 500);
+  const job = schedule.scheduleJob('0 10 * * *', function() {
+		console.log('It\'s 10:00 AM, time to spawn monsters!');
+		spawnWrapper();
+	});
+	console.log(`Monster spawn job scheduled at ${job.nextInvocation()}`);
 
 })
 
