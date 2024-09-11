@@ -9,7 +9,9 @@ const { setRules, obtainRules } = require('./rules');
 const { attackMonster, checkHealth, spawnMonster } = require('./monsters');
 
 require('dotenv').config();
+
 const token = process.env.TOKEN;
+const guildId = process.env.GUILD_ID;
 
 // Create a new bot client
 const client = new Client({ 
@@ -24,7 +26,41 @@ const client = new Client({
 
 const HEALTH_PER_MEMBER = 100;
 const DAMAGE_COUNTS = new Map();
-const MONSTER_SPAWN_INTERVAL = 60 // defined interval in seconds
+let DEAD_NOTIF_SENT = false;
+
+///////////////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////// UTILITY FUNCTIONS ////////////////////////////////////
+const spawnWrapper = () => {
+	const guild = client.guilds.cache.get(guildId);
+	spawnMonster(HEALTH_PER_MEMBER * guild.memberCount);
+
+	const generalChannel = guild.channels.cache.find(channel => channel.name === 'general');
+	generalChannel.send(`Beware adventurers! A monster has appeared in the Dream Realm! Defeat it by using words that follow the rules of the day! The rules of the day are: \n \t1. ${rules[0].name} \n2. ${rules[1].name}`);
+	generalChannel.send(`\`\`\`
+              /|                                           |\\                 
+             /||             ^               ^             ||\\                
+            / \\\\__          //               \\\\          __// \\               
+           /  |_  \\         | \\   /     \\   / |         /  _|  \\              
+          /  /  \\  \\         \\  \\/ \\---/ \\/  /         /  /     \\             
+         /  /    |  \\         \\  \\/\\   /\\/  /         /  |       \\            
+        /  /     \\   \\__       \\ ( 0\\ /0 ) /       __/   /        \\           
+       /  /       \\     \\___    \\ \\_/|\\_/ /    ___/     /\\         \\          
+      /  /         \\_)      \\___ \\/-\\|/-\\/ ___/      (_/\\ \\      \`  \\         
+     /  /           /\\__)       \\/  oVo  \\/       (__/   \` \\      \`  \\        
+    /  /           /,   \\__)    (_/\\ _ /\\_)    (__/         \`      \\  \\       
+   /  \'           //       \\__)  (__V_V__)  (__/                    \\  \\      
+  /  \'  \'        /\'           \\   |{___}|   /         .              \\  \\     
+ /  \'  /        /              \\/ |{___}| \\/\\          \`              \\  \\    
+/     /        \'                \\/{_____}\\/  \\          \\    \`         \\  \\  
+     /                          /{_______}\\   \\          \\    \\            \\     
+                               /{___/_\\___}\\   \`          \\    \`
+			
+			\`\`\``
+	);
+	generalChannel.send(`Vorazk, the Void Stalker has appeared! He has spawned with ${checkHealth()} health. Defeat him before the day ends!`);
+	return;
+	};
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,62 +99,32 @@ for (const folder of commandFolders) {
  */
 client.once(Events.ClientReady, async readyClient => {
 	console.log(`Logged in as ${readyClient.user.tag}`);
-	console.log('Setting rules for today...');
-	
-	setRules();
-	const rules = obtainRules();
-  console.log(`Rules: \n \t1. ${rules[0].name} \n \t2. ${rules[1].name}`);
 
-  console.log("Ready!");
-	console.log("------------------------------------");
-	console.log("Listening to messages... \n");
-
-	const spawnWrapper = () => {
-		const guild = client.guilds.cache.get(process.env.GUILD_ID);
-		spawnMonster(HEALTH_PER_MEMBER * guild.memberCount);
-		// spawnMonster(1);
-	
-		const generalChannel = guild.channels.cache.find(channel => channel.name === 'general');
-		generalChannel.send(`Beware adventurers! A monster has appeared in the Dream Realm! Defeat it by using words that follow the rules of the day! The rules of the day are: \n \t1. ${rules[0].name} \n2. ${rules[1].name}`);
-		
-		generalChannel.send(`\`\`\`
-              /|                                           |\\                 
-             /||             ^               ^             ||\\                
-            / \\\\__          //               \\\\          __// \\               
-           /  |_  \\         | \\   /     \\   / |         /  _|  \\              
-          /  /  \\  \\         \\  \\/ \\---/ \\/  /         /  /     \\             
-         /  /    |  \\         \\  \\/\\   /\\/  /         /  |       \\            
-        /  /     \\   \\__       \\ ( 0\\ /0 ) /       __/   /        \\           
-       /  /       \\     \\___    \\ \\_/|\\_/ /    ___/     /\\         \\          
-      /  /         \\_)      \\___ \\/-\\|/-\\/ ___/      (_/\\ \\      \`  \\         
-     /  /           /\\__)       \\/  oVo  \\/       (__/   \` \\      \`  \\        
-    /  /           /,   \\__)    (_/\\ _ /\\_)    (__/         \`      \\  \\       
-   /  \'           //       \\__)  (__V_V__)  (__/                    \\  \\      
-  /  \'  \'        /\'           \\   |{___}|   /         .              \\  \\     
- /  \'  /        /              \\/ |{___}| \\/\\          \`              \\  \\    
-/     /        \'                \\/{_____}\\/  \\          \\    \`         \\  \\  
-     /                          /{_______}\\   \\          \\    \\            \\     
-                               /{___/_\\___}\\   \`          \\    \`
-			
-			\`\`\``
-		);
-		generalChannel.send(`Vorazk, the Void Stalker has appeared! He has spawned with ${checkHealth()} health. Defeat him before the day ends!`);
-		return;
-	};
-
-	// spawnWrapper();
-
-	// Spawning the monster and determining its health
-  const job = schedule.scheduleJob('0 10 * * *', function() {
+	// Scheduling the monster spawn job. This job will run everyday at 10:00 AM.
+  const job = schedule.scheduleJob('0 10 * * *', () => {
 		console.log('It\'s 10:00 AM, time to spawn monsters!');
+		
+		// 1. Setting the rules for the day
+		console.log('Setting rules for today...');
+		setRules();
+		const rules = obtainRules();
+		console.log(`Rules: \n \t1. ${rules[0].name} \n \t2. ${rules[1].name}`);
+
+		// 2. Spawning the monster
 		spawnWrapper();
+		DEAD_NOTIF_SENT = false;
 	});
 	console.log(`Monster spawn job scheduled at ${job.nextInvocation()}`);
 
+	// 3. The bot is ready and listening to messages
+  console.log("Ready!");
+	console.log("------------------------------------");
+	console.log("Listening to messages... \n");
 })
 
 /**
  * Runs whenever a new interaction is created
+ * This part of the code is responsible for handling slash commands
  */
 client.on(Events.InteractionCreate, async interaction => {
 	if (!interaction.isChatInputCommand()) return;
@@ -142,30 +148,37 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 /**
- * Listen to messages
+ * Listen to messages. Will run everytime a new message is sent by any user in the server
+ * This part of the code is responsible for handling messages
+ * NOTE: This bot will only listen to messages in the 'general' channel
  */
 client.on(Events.MessageCreate, message => {
-  if (message.author.bot) return;
-	if (checkHealth() <= 0) return;
+  if (message.author.bot) return; // If the message is sent by a bot, do not process it
+	if (checkHealth() <= 0) return; // If the monster is already dead, do not process any more messages
+	if (message.channel.name !== 'general') return; // If the message is not sent in the 'general' channel, do not process it
 
 	console.log("--> " + message.content);
 	const originalContent = message.content;
+
+	// Split the message into separate words
 	const words = originalContent.split(" ");
 
 	let damage = 0;
 
+	// Check each word if it is valid
 	for (const word of words) {
 		try {
 			if (checkRule(word) && wordExists(word)) {
 				console.log(`The word "${word}" is valid.`);
-				damage += word.length;
+				damage += word.length; // If valid, add the length of the word as damage
 			} else {
 				if (!wordExists(word)) {
-					console.log(`The word "${word}" does not exist.`);
+					console.log(`The word "${word}" does not exist in the English dictionary.`);
 					// Note that we are using a predefined library of words, so new words might not be included
 					// TODO: Improve this by using a more comprehensive dictionary
 				} else {
 					console.log(`The word "${word}" is invalid.`);
+					// This happens when the word breaks one or two of the rules
 				}
 			}
 		} catch (error) {
@@ -173,6 +186,7 @@ client.on(Events.MessageCreate, message => {
 		}
 	}
 
+	// If any of the words are valid, attack the monster
 	if (damage > 0) {
 		console.log(`Total damage: ${damage}`);
 		attackMonster(damage);
@@ -184,10 +198,11 @@ client.on(Events.MessageCreate, message => {
 		// TODO: Create a tracking feature that tracks each persons damage dealt per day
 	}
 
+	// Check if the monster is dead or not
 	const currentHealth = checkHealth();
-	const guild = client.guilds.cache.get(process.env.GUILD_ID);
+	const guild = client.guilds.cache.get(guildId);
 	const generalChannel = guild.channels.cache.find(channel => channel.name === 'general');
-	if (currentHealth <= 0) {
+	if (currentHealth <= 0 && !DEAD_NOTIF_SENT) {
 		generalChannel.send(` \`\`\`
  ,-=-.  
 /  +  \\    
@@ -196,8 +211,8 @@ client.on(Events.MessageCreate, message => {
 |_____|
 			\`\`\` `);
 		generalChannel.send(`Good job! Vorazk has been defeated! But beware, he will return soon! 🧛‍♂️`);
+		DEAD_NOTIF_SENT = true;
 	}
-
 });
 
 // Run the client by logging in with your Token
